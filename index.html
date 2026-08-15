@@ -89,6 +89,12 @@ input,textarea,select{font-family:inherit;}
 .nav-links a:hover{color:var(--text);background:rgba(96,140,255,0.08);border-color:var(--border);}
 .nav-links a.active{color:#fff;background:rgba(47,91,255,0.18);border-color:var(--border-strong);}
 .nav-cta{display:flex;gap:8px;}
+.nav-ticket-link{position:relative;display:inline-flex;align-items:center;gap:6px;}
+.ticket-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#ff5c7c;color:#fff;font-size:11px;font-weight:800;line-height:1;box-shadow:0 0 12px rgba(255,92,124,.35);}
+.ticket-notice-pop{position:fixed;top:78px;right:20px;z-index:120;max-width:min(380px,calc(100vw - 40px));padding:12px 16px;border:1px solid var(--border-strong);border-radius:14px;background:rgba(12,20,40,.96);box-shadow:0 14px 40px rgba(0,0,0,.35);color:var(--text);font-size:13px;display:none;}
+.ticket-notice-pop.show{display:block;animation:ticketNoticeIn .25s ease;}
+@keyframes ticketNoticeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
 .hamburger{display:none;background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;width:40px;height:40px;align-items:center;justify-content:center;}
 
 /* BUTTONS */
@@ -541,6 +547,8 @@ let STATE = {
   adminTab: "overview",
   ticketAdminTab: "open",
   ticketUserTab: "open",
+  unreadTicketCount: 0,
+  lastTicketNoticeAt: 0,
   authError: "",
   authNotice: "",
   joinError: "",
@@ -675,10 +683,12 @@ async function loadAll(){
 
   STATE.loaded = true;
   if(STATE.user) {
+    startTicketPolling();
     setTimeout(async()=>{
       await refreshMyStatus();
       await refreshAnnouncements();
       if(hasApprovedMembership()) await refreshTickets();
+       if(hasApprovedMembership()) requestTicketNotifications();
       render();
     }, 0);
   }
@@ -774,15 +784,54 @@ async function refreshAnnouncements(){
 }
 
 async function refreshTickets(){
-  if(!STATE.user || !STATE.user.username || !hasApprovedMembership()) { STATE.tickets=[]; return []; }
+  if(!STATE.user || !STATE.user.username || !hasApprovedMembership()){ STATE.tickets=[]; STATE.unreadTicketCount=0; return []; }
   try{
     const r=await yankerApi("tickets");
+    const oldTickets=STATE.tickets||[];
     STATE.tickets=r.tickets||[];
-    const latest=STATE.tickets.reduce((max,t)=>Math.max(max,Number(t.createdAt||0)),0);
+    const answered=STATE.tickets.filter(t=>t.status==="answered");
+    STATE.unreadTicketCount=answered.length;
+
+    const lastNoticeKey="yanker_ticket_notice_"+STATE.user.username;
+    const previous=Number(localStorage.getItem(lastNoticeKey)||0);
+    const newest=answered.reduce((max,t)=>Math.max(max,Number(t.updatedAt||t.updated_at||0)),0);
+
+    if(newest>previous && newest>0){
+      localStorage.setItem(lastNoticeKey,String(newest));
+      if(oldTickets.length){
+        showTicketNotice("📩 مدیریت به یکی از تیکت‌های شما پاسخ داده است.");
+        try{
+          if("Notification" in window && Notification.permission==="granted"){
+            new Notification("Yanker — پاسخ جدید تیکت",{body:"مدیریت به تیکت شما پاسخ داده است."});
+          }
+        }catch(e){}
+      }
+    }
+
+    const latest=STATE.tickets.reduce((max,t)=>Math.max(max,Number(t.createdAt||t.created_at||0)),0);
     if(latest && Date.now()-latest<10000) ticketCooldownUntil=Math.max(ticketCooldownUntil,latest+10000);
     return STATE.tickets;
-  }catch(e){ console.warn("ticket sync failed",e); return []; }
+  }catch(e){ console.warn("ticket sync failed",e); return STATE.tickets||[]; }
 }
+function showTicketNotice(text){
+  let el=document.getElementById("ticketNoticePop");
+  if(!el){
+    el=document.createElement("div");
+    el.id="ticketNoticePop";
+    el.className="ticket-notice-pop";
+    document.body.appendChild(el);
+  }
+  el.textContent=text;
+  el.classList.add("show");
+  clearTimeout(window.__ticketNoticeTimer);
+  window.__ticketNoticeTimer=setTimeout(()=>el.classList.remove("show"),5000);
+}
+function requestTicketNotifications(){
+  try{
+    if("Notification" in window && Notification.permission==="default") Notification.requestPermission().catch(()=>{});
+  }catch(e){}
+}
+
 let ticketCooldownUntil=0;
 async function createTicket(e){
   e.preventDefault();
@@ -876,6 +925,16 @@ window.addEventListener("hashchange",()=>{
   }
   if(STATE.user && STATE.route==="tickets") refreshTickets().then(()=>render()).catch(()=>{});
 });
+
+let __ticketPollTimer=null;
+function startTicketPolling(){
+  clearInterval(__ticketPollTimer);
+  if(!STATE.user || !hasApprovedMembership()) return;
+  __ticketPollTimer=setInterval(async()=>{
+    try{ await refreshTickets(); render(); }catch(e){}
+  },20000);
+}
+
 window.addEventListener("pageshow", async ()=>{
   try{
     if(STATE.loaded){ await loadAll(); render(); }
@@ -1150,7 +1209,7 @@ function navBar(){
     ["home","خانه"], ["rules","قوانین"],
     ...(hasApprovedMembership() ? [["members","اعضا"],["announcements","اطلاعیه‌ها"]] : []),
     ["join","درخواست عضویت"],
-    ...(hasApprovedMembership() ? [["tickets","تیکت"]] : [])
+    ...(hasApprovedMembership() ? [["tickets",`تیکت${STATE.unreadTicketCount>0?` <span class="ticket-unread-badge">${STATE.unreadTicketCount>99?"99+":STATE.unreadTicketCount}</span>`:""}`]] : [])
   ];
   return `
   <div class="nav">
@@ -1160,7 +1219,7 @@ function navBar(){
         <div>YANKER<div class="brand-sub">SUNSET CITY</div></div>
       </div>
       <div class="nav-links">
-        ${links.map(([r,l])=>`<a href="#/${r}" class="${STATE.route===r?'active':''}">${l}</a>`).join("")}
+        ${links.map(([r,l])=>`<a href="#/${r}" class="${STATE.route===r?'active':''}">${r==="tickets"?l:esc(l)}</a>`).join("")}
         ${STATE.user && ROLE_LEVEL[STATE.user.role] >= 2 ? `<a href="#/admin" class="${STATE.route==='admin'?'active':''}" onclick="event.preventDefault();nav('admin')">پنل مدیریت</a>` : ""}
       </div>
       <div class="nav-cta">
@@ -1585,7 +1644,7 @@ function viewTickets(){
   const cooldown=Math.max(0,Math.ceil((ticketCooldownUntil-Date.now())/1000));
   return `<div class="ticket-page">
     <div class="ticket-hero wrap">
-      <div><div class="section-eyebrow">YANKER SUPPORT CENTER</div><h2 class="ticket-title">مرکز پشتیبانی اختصاصی</h2><p class="ticket-subtitle">ارتباط مستقیم و مرتب با مدیریت؛ هر موضوع را در یک تیکت جداگانه پیگیری کن.</p></div>
+      <div><div class="section-eyebrow">YANKER SUPPORT CENTER</div><h2 class="ticket-title">مرکز پشتیبانی اختصاصی ${STATE.unreadTicketCount>0?`<span class="ticket-unread-badge" style="vertical-align:middle;margin-right:8px;">${STATE.unreadTicketCount} پاسخ جدید</span>`:""}</h2><p class="ticket-subtitle">ارتباط مستقیم و مرتب با مدیریت؛ هر موضوع را در یک تیکت جداگانه پیگیری کن.</p></div>
       <div class="ticket-orb">🎫<span>SUPPORT</span></div>
     </div>
     <div class="wrap">
