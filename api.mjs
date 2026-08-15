@@ -476,10 +476,10 @@ export async function handler(event) {
       if(!/^(?:[1-9]|1[0-4])$/.test(rank)) return reply(400, { ok:false, error:"رنک باید بین 1 تا 14 باشد." });
       const rows = await db(`members?id=eq.${encodeURIComponent(id)}&limit=1`);
       if (!rows?.length) return reply(404, { ok: false, error: "عضو پیدا نشد." });
+      const rankNum = Number.parseInt(String(rank), 10);
       const targetRank = rankNumber(rows[0].rank);
-      if (!actor.isOwner) {
-        if (targetRank >= 11) return reply(403, {ok:false,error:"اعضای رنک 11 تا 14 برای رنک 11+ قابل تغییر نیستند."});
-        if (rankNumber(rank) > 10) return reply(403, {ok:false,error:"این پنل فقط می‌تواند رنک 1 تا 10 بدهد."});
+      if (!actor.isOwner && rankNumber(rank) < 1) {
+        return reply(400, {ok:false,error:"رنک نامعتبر است."});
       }
       const updated = await db(`members?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ rank }) });
       return reply(200, { ok: true, member: mapMember(updated?.[0] || { ...rows[0], rank }, false) });
@@ -501,7 +501,6 @@ export async function handler(event) {
       const id = String(body.id || "");
       const rows = await db(`members?id=eq.${encodeURIComponent(id)}&limit=1`);
       if (!rows?.length) return reply(404, { ok: false, error: "عضو پیدا نشد." });
-      if (!actor.isOwner && rankNumber(rows[0].rank) >= 11) return reply(403, {ok:false,error:"اعضای رنک 11 تا 14 برای رنک 11+ قابل حذف نیستند."});
       await db(`members?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
       return reply(200, { ok: true });
     }
