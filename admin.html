@@ -159,7 +159,7 @@ async function load(){
     $("members").innerHTML=m.members.length
       ? '<table><thead><tr><th>نام</th><th>کاربر</th><th>Discord</th><th>رتبه</th><th>عملیات</th></tr></thead><tbody>'
         +m.members.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.username)+'</td><td>'+esc(x.discord)+'</td><td><select class="rank-select" data-id="'+esc(x.id)+'">'
-        +Array.from({length:14},(_,i)=>String(i+1)).map(rank=>'<option '+(String(x.rank)===rank?"selected":"")+'>Rank '+rank+'</option>').join("")
+        +[...Array(14)].map((_,i)=>String(i+1)).map(rank=>'<option value="'+rank+'" '+(String(x.rank)===String(rank)?"selected":"")+'>'+rank+'</option>').join("")
         +'</select></td><td><button class="btn danger member-delete" data-id="'+esc(x.id)+'">حذف</button></td></tr>').join("")
         +'</tbody></table>'
       : '<div class="notice">هنوز عضوی تأیید نشده است.</div>';
