@@ -58,6 +58,20 @@ function checkToken(event) {
   } catch { return false; }
 }
 
+function isOwnerToken(event) {
+  const payload = getTokenPayload(event);
+  return !!payload && payload.role === "owner";
+}
+
+function isMemberAdminToken(event) {
+  const payload = getTokenPayload(event);
+  return !!payload && payload.role === "member_admin" && Number(payload.rank) >= 11;
+}
+
+function requireOwner(event) {
+  return isOwnerToken(event);
+}
+
 function dbReady() { return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY); }
 
 async function db(path, options = {}) {
@@ -347,6 +361,17 @@ export async function handler(event) {
 
     if (!checkToken(event)) return reply(401, { ok: false, error: "دسترسی مدیریت لازم است." });
 
+    // Rank 11+ members get a separate, passwordless admin panel.
+    // Their scope is intentionally limited to tickets, membership approval/deletion,
+    // and assigning ranks up to 6. Owner keeps full access to the original panel.
+    const ownerOnlyActions = new Set([
+      "stats", "announcements", "announcement-create", "announcement-update",
+      "announcement-delete"
+    ]);
+    if (isMemberAdminToken(event) && ownerOnlyActions.has(action)) {
+      return reply(403, { ok: false, error: "این بخش فقط برای Owner در دسترس است." });
+    }
+
     if (event.httpMethod === "GET" && action === "requests") return reply(200, { ok: true, requests: await getRequestsFor() });
 
     if (event.httpMethod === "GET" && action === "stats") {
@@ -396,6 +421,9 @@ export async function handler(event) {
     if (event.httpMethod === "POST" && action === "review") {
       const id = String(body.id || "");
       const decision = body.decision;
+      if (isMemberAdminToken(event) && decision !== "approve") {
+        return reply(403, { ok:false, error:"پنل رنک 11+ فقط امکان قبول کردن اعضا را دارد." });
+      }
       if (!id || !["approve", "reject"].includes(decision)) return reply(400, { ok: false, error: "درخواست یا تصمیم نامعتبر است." });
       const rows = await db(`requests?id=eq.${encodeURIComponent(id)}&limit=1`);
       const request = rows?.[0];
@@ -430,6 +458,9 @@ export async function handler(event) {
     if (event.httpMethod === "POST" && action === "member-rank") {
       const id = String(body.id || "");
       const rank = normalizeRank(body.rank);
+      if (isMemberAdminToken(event) && Number(rank) > 6) {
+        return reply(403, { ok:false, error:"در پنل رنک 11+ فقط امکان دادن رنک 1 تا 6 وجود دارد." });
+      }
       if(!/^(?:[1-9]|1[0-4])$/.test(rank)) return reply(400, { ok:false, error:"رنک باید بین 1 تا 14 باشد." });
       const rows = await db(`members?id=eq.${encodeURIComponent(id)}&limit=1`);
       if (!rows?.length) return reply(404, { ok: false, error: "عضو پیدا نشد." });
@@ -438,6 +469,7 @@ export async function handler(event) {
     }
 
     if (event.httpMethod === "POST" && action === "request-delete") {
+      if (isMemberAdminToken(event)) return reply(403, { ok:false, error:"حذف درخواست فقط برای Owner است." });
       const id = String(body.id || "");
       if (!id) return reply(400, { ok: false, error: "شناسه درخواست نامعتبر است." });
       const rows = await db(`requests?id=eq.${encodeURIComponent(id)}&limit=1`);
