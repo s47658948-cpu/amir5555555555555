@@ -478,8 +478,12 @@ export async function handler(event) {
       if (!rows?.length) return reply(404, { ok: false, error: "عضو پیدا نشد." });
       const targetRank = rankNumber(rows[0].rank);
       if (!actor.isOwner) {
-        if (targetRank >= 11) return reply(403, {ok:false,error:"اعضای رنک 11 تا 14 برای رنک 11+ قابل تغییر نیستند."});
-        if (rankNumber(rank) > 10) return reply(403, {ok:false,error:"این پنل فقط می‌تواند رنک 1 تا 10 بدهد."});
+        if (targetRank >= 11) {
+          return reply(403, {ok:false,error:"اعضای رنک 11 تا 14 برای رنک 11+ قابل تغییر نیستند."});
+        }
+        if (rankNumber(rank) > 10) {
+          return reply(403, {ok:false,error:"رنک 11+ فقط می‌تواند رنک اعضای 1 تا 10 را مدیریت کند."});
+        }
       }
       const updated = await db(`members?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ rank }) });
       return reply(200, { ok: true, member: mapMember(updated?.[0] || { ...rows[0], rank }, false) });
