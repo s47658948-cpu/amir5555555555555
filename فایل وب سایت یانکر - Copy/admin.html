@@ -1,0 +1,294 @@
+<!doctype html><html lang="fa" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YANKER — پنل مدیریت</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#060a12;color:#edf2ff;font-family:Tahoma,Arial,sans-serif}.wrap{max-width:1400px;margin:auto;padding:24px}
+.card{background:#0f1727;border:1px solid #263653;border-radius:18px;padding:20px;margin:14px 0}.login{max-width:430px;margin:12vh auto}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.stat b{display:block;font-size:30px;margin-top:7px}.muted{color:#93a2c1}
+input,select{width:100%;padding:11px;margin-top:7px;border:1px solid #2b3d5e;background:#080e19;color:#fff;border-radius:10px}label{display:block;margin:12px 0}
+.btn{padding:10px 14px;border:0;border-radius:10px;color:#fff;background:#2a3a59;cursor:pointer}.primary{background:#315eff}.success{background:#14603e}.danger{background:#7a2036}.ghost{background:transparent;border:1px solid #30415f}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.table{overflow:auto}table{width:100%;min-width:950px;border-collapse:collapse}th,td{text-align:right;padding:13px;border-bottom:1px solid #202d45}
+.badge{display:inline-block;padding:5px 9px;border-radius:99px;font-size:12px}.pending{background:#594713;color:#ffd56a}.approved{background:#123d2c;color:#70e0ad}.rejected{background:#521b2d;color:#ff8ca7}
+.admin-ticket-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.admin-ticket-form label{margin:0}.admin-ticket-form textarea{grid-column:1/-1;min-height:130px;padding:11px;margin-top:7px;border:1px solid #2b3d5e;background:#080e19;color:#fff;border-radius:10px;width:100%;resize:vertical}.admin-ticket-form button{justify-self:start}.notice{padding:12px;border-radius:10px;background:#14223b;margin-top:10px}.err{background:#4e1829}.hidden{display:none}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}
+
+.admin-app{min-height:calc(100vh - 48px);display:grid;grid-template-columns:250px minmax(0,1fr);background:linear-gradient(135deg,#070b13,#0b1120 55%,#08101b);border:1px solid #1e2b44;border-radius:26px;overflow:hidden;box-shadow:0 35px 100px rgba(0,0,0,.45)}
+.admin-sidebar{background:rgba(7,12,22,.9);border-left:1px solid #1d2940;padding:22px 14px;display:flex;flex-direction:column;gap:7px}.admin-brand{display:flex;align-items:center;gap:11px;padding:6px 8px 22px}.admin-logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:21px;font-weight:900;background:linear-gradient(145deg,#315eff,#203a9a);box-shadow:0 12px 30px rgba(49,94,255,.28)}.admin-brand b{display:block;letter-spacing:2px}.admin-brand span{display:block;color:#687896;font-size:8px;letter-spacing:2px;margin-top:3px}.admin-side-label{font-size:9px;color:#53627d;padding:8px 12px 4px;letter-spacing:1.6px}.admin-nav{border:1px solid transparent;background:transparent;color:#9eabc3;border-radius:12px;padding:12px 13px;text-align:right;display:flex;align-items:center;gap:11px;cursor:pointer;font-size:13px;transition:.18s}.admin-nav:hover{background:#111b2d;color:#fff}.admin-nav.active{background:linear-gradient(90deg,rgba(49,94,255,.22),rgba(49,94,255,.07));border-color:#2b4b9b;color:#fff;box-shadow:inset -3px 0 #4c78ff}.admin-nav i{margin-right:auto;background:#315eff;color:#fff;border-radius:99px;font-style:normal;font-size:9px;padding:3px 7px}.admin-sidebar-spacer{flex:1}.danger-nav{color:#d78a99}.admin-content{padding:34px;min-width:0}.admin-topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:28px}.admin-topbar h1{font-size:32px;margin:4px 0}.admin-topbar p,.section-title-row p,.card-head span{color:#7383a0;font-size:12px;margin:0;line-height:1.8}.eyebrow{font-size:9px;letter-spacing:2.5px;color:#5d8aff;font-weight:800}.admin-status{padding:8px 12px;border:1px solid #203450;border-radius:99px;color:#8ea0be;font-size:10px}.admin-status span{display:inline-block;width:7px;height:7px;border-radius:50%;background:#31e2a0;margin-left:6px;box-shadow:0 0 10px #31e2a0}.admin-section{display:none}.admin-section.active{display:block}.section-title-row{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:18px}.section-title-row h2{margin:4px 0 3px;font-size:23px}.admin-card{background:linear-gradient(180deg,rgba(16,24,40,.86),rgba(9,14,25,.86));border:1px solid #202e47;border-radius:19px;padding:18px;margin-bottom:16px;box-shadow:0 16px 45px rgba(0,0,0,.13)}.card-head{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}.card-head h3{margin:0 0 4px;font-size:16px}.compose-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(49,94,255,.12);border:1px solid #294477;color:#7fa2ff}.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:15px}.quick-card{position:relative;text-align:right;background:#0d1626;border:1px solid #1f2e48;border-radius:17px;padding:18px;color:#fff;cursor:pointer;transition:.18s}.quick-card:hover{transform:translateY(-2px);border-color:#34559a}.quick-card strong{display:block;font-size:14px;margin-bottom:6px}.quick-card span{display:block;color:#6f809d;font-size:11px;line-height:1.7}.quick-card b{position:absolute;left:16px;top:17px;color:#6f91ff}.stats-grid{grid-template-columns:repeat(4,1fr);margin:0}.stats-grid .card{margin:0}.support-compose{background:radial-gradient(circle at 10% 0%,rgba(49,94,255,.1),transparent 38%),linear-gradient(180deg,rgba(16,24,40,.94),rgba(9,14,25,.9))}.admin-ticket-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.admin-ticket-form label{margin:0}.admin-ticket-form .full{grid-column:1/-1}.admin-ticket-form textarea{min-height:130px;padding:11px;margin-top:7px;border:1px solid #2b3d5e;background:#080e19;color:#fff;border-radius:10px;width:100%;resize:vertical}.admin-ticket-form input,.admin-ticket-form select{margin-top:7px}.ticket-admin-list{display:grid;gap:12px}.ticket-admin-item{background:#0b1321;border:1px solid #1d2a40;border-radius:16px;padding:15px}.ticket-admin-item .thread{max-height:260px;overflow:auto;display:grid;gap:8px;margin:12px 0}.ticket-msg{padding:10px 12px;border-radius:12px;background:#111b2c;border:1px solid #1c2a41}.ticket-msg.admin{background:rgba(49,226,160,.045);border-color:rgba(49,226,160,.16)}.ticket-actions{display:flex;gap:8px;flex-wrap:wrap}.status-pill{font-size:10px;padding:5px 9px;border-radius:99px}.status-pill.open{background:#3b3012;color:#ffd66d}.status-pill.answered{background:#12352a;color:#7ce8bd}.status-pill.closed{background:#351923;color:#ff9aac}
+@media(max-width:1000px){.admin-app{grid-template-columns:1fr}.admin-sidebar{border-left:0;border-bottom:1px solid #1d2940;display:grid;grid-template-columns:repeat(4,1fr)}.admin-brand,.admin-side-label,.admin-sidebar-spacer{display:none}.admin-nav{justify-content:center}.admin-content{padding:22px}.quick-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.admin-ticket-form{grid-template-columns:1fr}.admin-ticket-form .full{grid-column:auto}.admin-topbar{flex-direction:column}.admin-nav span{font-size:10px}.admin-nav{padding:10px 6px}.admin-content{padding:15px}}
+.ticket-filter{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}.ticket-filter-btn{border:1px solid #243653;background:#0b1321;color:#7f8da8;padding:9px 12px;border-radius:11px;cursor:pointer}.ticket-filter-btn.active{background:#132342;color:#fff;border-color:#3d5fa8}.ticket-filter-btn b{color:#7fa2ff;margin-right:5px}</style></head><body><div class="wrap">
+<div id="login" class="login card"><h1>YANKER / ADMIN</h1><p class="muted">مدیریت واقعی درخواست‌های عضویت</p>
+<form id="loginForm" autocomplete="on"><label>نام کاربری<input name="username" value="owner" autocomplete="username" autocapitalize="none" spellcheck="false" required></label><label>رمز عبور<input name="password" type="password" autocomplete="current-password" required></label><button type="submit" class="btn primary" style="width:100%">ورود به پنل</button></form><div id="loginMsg"></div></div>
+<div id="panel" class="hidden">
+  <div class="admin-app">
+    <aside class="admin-sidebar">
+      <div class="admin-brand"><div class="admin-logo">Y</div><div><b>YANKER</b><span>CONTROL CENTER</span></div></div>
+      <div class="admin-side-label">مدیریت</div>
+      <button class="admin-nav active" data-section="dashboard">⌂ <span>نمای کلی</span></button>
+      <button class="admin-nav" data-section="requests">📥 <span>درخواست‌های عضویت</span></button>
+      <button class="admin-nav" data-section="members">👥 <span>اعضای رسمی</span></button>
+      <button class="admin-nav" data-section="community">◈ <span>اطلاعیه‌ها</span></button>
+      <button class="admin-nav" data-section="support">✦ <span>مرکز تیکت</span><i id="ticketNavBadge">0</i></button>
+      <div class="admin-sidebar-spacer"></div>
+      <button id="refreshBtn" class="admin-nav">↻ <span>بروزرسانی</span></button>
+      <button id="logoutBtn" class="admin-nav danger-nav">↪ <span>خروج</span></button>
+    </aside>
+    <main class="admin-content">
+      <header class="admin-topbar"><div><div class="eyebrow">YANKER / ADMIN</div><h1>مرکز کنترل</h1><p>همه‌چیز مرتب، سریع و بدون شلوغی.</p></div><div class="admin-status"><span></span> سیستم آنلاین</div></header>
+      <section class="admin-section active" data-section-panel="dashboard">
+        <div class="section-title-row"><div><h2>نمای کلی</h2><p>وضعیت فعلی کامیونیتی را یک‌جا ببین.</p></div></div>
+        <div id="stats" class="grid stats-grid"></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-jump="requests"><strong>درخواست‌ها و اعضا</strong><span>بررسی درخواست‌ها و مدیریت Rank</span><b>→</b></button>
+          <button class="quick-card" data-jump="community"><strong>اطلاعیه‌ها</strong><span>انتشار و مدیریت اطلاعیه‌های جدید</span><b>→</b></button>
+          <button class="quick-card" data-jump="support"><strong>مرکز تیکت</strong><span>پاسخ‌گویی و ارسال پیام مستقیم</span><b>→</b></button>
+        </div>
+      </section>
+      <section class="admin-section" data-section-panel="requests">
+        <div class="section-title-row"><div><div class="eyebrow">MEMBERSHIP REQUESTS</div><h2>درخواست‌های عضویت</h2><p>بررسی سریع، بدون شلوغی.</p></div></div>
+        <div class="admin-card"><div class="card-head"><div><h3>صف درخواست‌ها</h3><span>تأیید، رد یا حذف</span></div></div><div id="requests" class="table"></div></div>
+      </section>
+      <section class="admin-section" data-section-panel="members">
+        <div class="section-title-row"><div><div class="eyebrow">OFFICIAL MEMBERS</div><h2>اعضای رسمی</h2><p>مدیریت Rank و اعضای تأییدشده.</p></div></div>
+        <div class="admin-card"><div class="card-head"><div><h3>اعضا</h3><span>تغییر Rank یا حذف</span></div></div><div id="members" class="table"></div></div>
+      </section>
+      <section class="admin-section" data-section-panel="community">
+        <div class="section-title-row"><div><div class="eyebrow">COMMUNITY</div><h2>اطلاعیه‌ها</h2><p>خبرها و اطلاعیه‌های جدید را منتشر کن.</p></div><button id="newAnnouncement" type="button" class="btn primary">+ اطلاعیه جدید</button></div>
+        <div id="announcementForm" class="admin-card hidden"><div class="card-head"><div><h3>اطلاعیه جدید</h3><span>عنوان و متن اطلاعیه را وارد کن.</span></div></div><label>عنوان<input id="annTitle"></label><label>متن<textarea id="annBody" style="width:100%;min-height:120px;padding:11px;margin-top:7px;border:1px solid #2b3d5e;background:#080e19;color:#fff;border-radius:10px"></textarea></label><button id="saveAnnouncement" class="btn success">انتشار اطلاعیه</button></div>
+        <div class="admin-card"><div id="announcements" class="table"></div></div>
+      </section>
+      <section class="admin-section" data-section-panel="support">
+        <div class="section-title-row"><div><div class="eyebrow">SUPPORT CENTER</div><h2>مرکز تیکت</h2><p>گفتگوها را مدیریت کن؛ با بستن تیکت، هیچ پیام قدیمی حذف نمی‌شود.</p></div></div>
+        <div class="support-compose admin-card"><div class="card-head"><div><h3>ارسال تیکت برای عضو</h3><span>یک گفتگوی جدید مستقیماً برای عضو ایجاد کن.</span></div><span class="compose-mark">✦</span></div><div class="admin-ticket-form"><label>عضو<select id="ticketMember"></select></label><label>موضوع<input id="ticketSubject" maxlength="120" placeholder="موضوع پیام"></label><label class="full">متن تیکت<textarea id="ticketBody" maxlength="3000" placeholder="متن پیام برای عضو..."></textarea></label><button id="sendMemberTicket" type="button" class="btn primary">ارسال به عضو</button></div></div>
+        <div class="admin-card"><div class="card-head"><div><h3>گفتگوها</h3><span>تیکت‌های فعال و بسته‌شده جدا هستند.</span></div><button id="refreshTickets" type="button" class="btn ghost">↻ بروزرسانی</button></div>
+        <div class="ticket-filter"><button class="ticket-filter-btn active" data-ticket-filter="open">فعال <b id="openTicketCount">0</b></button><button class="ticket-filter-btn" data-ticket-filter="closed">بسته‌شده <b id="closedTicketCount">0</b></button></div>
+        <div id="tickets" class="ticket-admin-list"></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+function activateAdminSection(section){
+  document.querySelectorAll('.admin-nav[data-section]').forEach(b=>b.classList.toggle('active',b.dataset.section===section));
+  document.querySelectorAll('.admin-section[data-section-panel]').forEach(p=>p.classList.toggle('active',p.dataset.sectionPanel===section));
+}
+document.addEventListener('click',function(e){
+  const nav=e.target.closest('.admin-nav[data-section]');
+  if(nav){ activateAdminSection(nav.dataset.section); return; }
+  const jump=e.target.closest('[data-jump]');
+  if(jump){ activateAdminSection(jump.dataset.jump); }
+});
+const API="/.netlify/functions/api";
+let token=localStorage.getItem("yanker_admin_token")||"";
+
+const $=(id)=>document.getElementById(id);
+let ticketFilter="open";
+const esc=(s)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(action, method="GET", body=null){
+  const headers={"Accept":"application/json"};
+  if(body!==null) headers["Content-Type"]="application/json";
+  if(token) headers["Authorization"]="Bearer "+token;
+
+  let response;
+  try{
+    response=await fetch(API+"?action="+encodeURIComponent(action),{
+      method,headers,body:body===null?undefined:JSON.stringify(body),
+      credentials:"same-origin"
+    });
+  }catch(e){
+    throw new Error("اتصال به سرور برقرار نشد. اگر سایت تازه Deploy شده، یک بار Deploy را دوباره انجام بده.");
+  }
+
+  const raw=await response.text();
+  let data={};
+  try{ data=raw?JSON.parse(raw):{} }catch(e){
+    throw new Error("پاسخ سرور نامعتبر است. احتمالاً Netlify Function هنوز فعال نشده.");
+  }
+
+  if(!response.ok) throw new Error(data.error||("خطای سرور: "+response.status));
+  return data;
+}
+
+function showPanel(){
+  $("login").classList.add("hidden");
+  $("panel").classList.remove("hidden");
+}
+
+function showLogin(){
+  $("panel").classList.add("hidden");
+  $("login").classList.remove("hidden");
+}
+
+function message(text,error=true){
+  $("loginMsg").innerHTML='<div class="notice '+(error?"err":"")+'">'+esc(text)+'</div>';
+}
+
+async function load(){
+  try{
+    const [s,r,m,a,t]=await Promise.all([
+      api("stats"),api("requests"),api("members"),api("announcements"),api("tickets-admin")
+    ]);
+
+    showPanel();
+
+    $("stats").innerHTML=[
+      ["کل درخواست‌ها",s.stats.totalRequests],
+      ["در انتظار",s.stats.pending],
+      ["تأیید شده",s.stats.approved],
+      ["اعضای رسمی",s.stats.members]
+    ].map(x=>'<div class="card stat"><span class="muted">'+x[0]+'</span><b>'+x[1]+'</b></div>').join("");
+
+    const badge=(status)=>{
+      const names={pending:"در انتظار",approved:"تأیید شده",rejected:"رد شده"};
+      return '<span class="badge '+status+'">'+(names[status]||status)+'</span>';
+    };
+
+    $("requests").innerHTML=r.requests.length
+      ? '<table><thead><tr><th>نام</th><th>کاربر</th><th>Discord</th><th>سن</th><th>Play Time</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>'
+        +r.requests.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.username)+'</td><td>'+esc(x.discord)+'</td><td>'+esc(x.cityAge)+' / '+esc(x.realAge)+'</td><td>'+esc(x.playtime)+'</td><td>'+badge(x.status)+'</td><td>'
+        +(x.status==="pending"
+          ? '<button class="btn success review-approve" data-id="'+esc(x.id)+'">تأیید</button> <button class="btn danger review-reject" data-id="'+esc(x.id)+'">رد</button> '
+          : 'بررسی شده ')
+        +'<button class="btn danger request-delete" data-id="'+esc(x.id)+'">حذف</button>'
+        +'</td></tr>').join("")
+        +'</tbody></table>'
+      : '<div class="notice">درخواستی وجود ندارد.</div>';
+
+    $("members").innerHTML=m.members.length
+      ? '<table><thead><tr><th>نام</th><th>کاربر</th><th>Discord</th><th>رتبه</th><th>عملیات</th></tr></thead><tbody>'
+        +m.members.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.username)+'</td><td>'+esc(x.discord)+'</td><td><select class="rank-select" data-id="'+esc(x.id)+'">'
+        +[...Array(14)].map((_,i)=>String(i+1)).map(rank=>'<option '+(x.rank===rank?"selected":"")+'>'+rank+'</option>').join("")
+        +'</select></td><td><button class="btn danger member-delete" data-id="'+esc(x.id)+'">حذف</button></td></tr>').join("")
+        +'</tbody></table>'
+      : '<div class="notice">هنوز عضوی تأیید نشده است.</div>';
+
+    document.querySelectorAll(".review-approve").forEach(b=>b.onclick=()=>review(b.dataset.id,"approve"));
+    document.querySelectorAll(".review-reject").forEach(b=>b.onclick=()=>review(b.dataset.id,"reject"));
+    document.querySelectorAll(".request-delete").forEach(b=>b.onclick=()=>deleteRequest(b.dataset.id));
+    document.querySelectorAll(".rank-select").forEach(s=>s.onchange=()=>rank(s.dataset.id,s.value));
+    document.querySelectorAll(".member-delete").forEach(b=>b.onclick=()=>del(b.dataset.id));
+
+    $("ticketMember").innerHTML=(m.members||[]).map(x=>'<option value="'+esc(x.username)+'">'+esc(x.name)+' — @'+esc(x.username)+'</option>').join('') || '<option value="">عضوی وجود ندارد</option>';
+    $("sendMemberTicket").disabled=!(m.members||[]).length;
+
+    $("announcements").innerHTML=(a.announcements||[]).length ? '<table><thead><tr><th>عنوان</th><th>متن</th><th>زمان</th><th>عملیات</th></tr></thead><tbody>'+(a.announcements||[]).map(x=>'<tr><td>'+esc(x.title)+'</td><td>'+esc(x.body)+'</td><td>'+esc(new Date(x.date).toLocaleString("fa-IR"))+'</td><td><button class="btn danger ann-del" data-id="'+esc(x.id)+'">حذف</button></td></tr>').join('')+'</tbody></table>' : '<div class="notice">اطلاعیه‌ای وجود ندارد.</div>';
+    document.querySelectorAll(".ann-del").forEach(b=>b.onclick=()=>deleteAnnouncement(b.dataset.id));
+
+    const allTickets=t.tickets||[], openTickets=allTickets.filter(x=>x.status!=="closed"), closedTickets=allTickets.filter(x=>x.status==="closed"), visibleTickets=ticketFilter==="closed"?closedTickets:openTickets;
+    $("tickets").innerHTML=visibleTickets.length ? visibleTickets.map(x=>'<div class="card ticket-admin-item"><div class="row"><div><b>'+esc(x.subject)+'</b><div class="muted">'+esc(x.name)+' · @'+esc(x.username)+'</div></div><span class="badge '+esc(x.status)+'">'+(x.status==="closed"?"بسته":x.status==="answered"?"پاسخ داده شده":"باز")+'</span></div><div class="thread">'+x.messages.map(m=>'<div class="ticket-msg '+(m.sender==="admin"?"admin":"")+'"><b>'+esc(m.sender==="admin"?"مدیریت":m.senderName)+'</b><div>'+esc(m.body)+'</div></div>').join('')+'</div><div class="ticket-actions">'+(x.status!=="closed"?'<button class="btn success ticket-reply" data-id="'+esc(x.id)+'">پاسخ</button><button class="btn ghost ticket-close" data-id="'+esc(x.id)+'">بستن تیکت</button>':'<span class="muted">سابقه گفتگو حفظ شده است.</span>')+'<button class="btn danger ticket-delete" data-id="'+esc(x.id)+'">حذف تیکت</button></div></div>').join('') : '<div class="notice">'+(ticketFilter==="closed"?"تیکت بسته‌شده‌ای وجود ندارد.":"تیکت فعالی وجود ندارد.")+'</div>';
+    if($("openTicketCount")) $("openTicketCount").textContent=openTickets.length;
+    if($("closedTicketCount")) $("closedTicketCount").textContent=closedTickets.length;
+    if($("ticketNavBadge")) $("ticketNavBadge").textContent=openTickets.length;
+    document.querySelectorAll(".ticket-reply").forEach(b=>b.onclick=()=>replyTicket(b.dataset.id));
+    document.querySelectorAll(".ticket-close").forEach(b=>b.onclick=()=>closeTicket(b.dataset.id));
+    document.querySelectorAll(".ticket-delete").forEach(b=>b.onclick=()=>deleteTicket(b.dataset.id));
+    document.querySelectorAll(".ticket-filter-btn").forEach(b=>b.classList.toggle("active",b.dataset.ticketFilter===ticketFilter));
+
+  }catch(e){
+    if(token){
+      localStorage.removeItem("yanker_admin_token");
+      token="";
+      showLogin();
+      message(e.message,true);
+    }else{
+      showLogin();
+      message(e.message,true);
+    }
+  }
+}
+
+async function login(event){
+  event.preventDefault();
+
+  const form=event.currentTarget;
+  const username=form.elements.username.value.trim();
+  const password=form.elements.password.value;
+
+  if(!username||!password){
+    message("نام کاربری و رمز عبور را وارد کنید.",true);
+    return;
+  }
+
+  const button=form.querySelector("button[type=submit],button");
+  if(button) { button.disabled=true; button.textContent="در حال ورود..."; }
+
+  try{
+    const data=await api("login","POST",{username,password});
+    if(!data.token) throw new Error("سرور توکن ورود ارسال نکرد.");
+
+    token=data.token;
+    localStorage.setItem("yanker_admin_token",token);
+    message("ورود موفق بود.",false);
+    await load();
+  }catch(e){
+    token="";
+    localStorage.removeItem("yanker_admin_token");
+    message(e.message,true);
+  }finally{
+    if(button){ button.disabled=false; button.textContent="ورود به پنل"; }
+  }
+}
+
+async function review(id,decision){
+  if(!confirm(decision==="approve"?"این درخواست تأیید شود؟":"این درخواست رد شود؟")) return;
+  try{ await api("review","POST",{id,decision}); await load(); }
+  catch(e){ alert(e.message); }
+}
+
+async function deleteRequest(id){
+  if(!confirm("این درخواست عضویت برای همیشه حذف شود؟")) return;
+  try{ await api("request-delete","POST",{id}); await load(); }
+  catch(e){ alert(e.message); }
+}
+
+async function rank(id,value){
+  try{ await api("member-rank","POST",{id,rank:value}); await load(); }
+  catch(e){ alert(e.message); }
+}
+
+async function del(id){
+  if(!confirm("این عضو حذف شود؟")) return;
+  try{ await api("member-delete","POST",{id}); await load(); }
+  catch(e){ alert(e.message); }
+}
+
+async function deleteAnnouncement(id){ if(!confirm("این اطلاعیه حذف شود؟"))return; try{await api("announcement-delete","POST",{id}); await load();}catch(e){alert(e.message);} }
+async function saveAnnouncement(){ const title=$("annTitle").value.trim(), body=$("annBody").value.trim(); if(!title||!body)return; try{await api("announcement-create","POST",{title,body}); $("annTitle").value="";$("annBody").value="";$("announcementForm").classList.add("hidden");await load();}catch(e){alert(e.message);} }
+async function replyTicket(id){ const message=prompt("پاسخ مدیریت:"); if(!message||!message.trim())return; try{await api("ticket-reply","POST",{id,message:message.trim()});await load();}catch(e){alert(e.message);} }
+async function closeTicket(id){ try{await api("ticket-close","POST",{id});await load();}catch(e){alert(e.message);} }
+async function deleteTicket(id){ if(!confirm("این تیکت و تمام پیام‌های آن برای همیشه حذف شود؟"))return; try{await api("ticket-delete","POST",{id});await load();}catch(e){alert(e.message);} }
+
+async function sendMemberTicket(){
+  const username=$("ticketMember").value;
+  const subject=$("ticketSubject").value.trim();
+  const message=$("ticketBody").value.trim();
+  if(!username||!subject||!message){ alert("عضو، موضوع و متن را کامل کنید."); return; }
+  const btn=$("sendMemberTicket"); btn.disabled=true; btn.textContent="در حال ارسال...";
+  try{ await api("ticket-create-admin","POST",{username,subject,message}); $("ticketSubject").value=""; $("ticketBody").value=""; await load(); }
+  catch(e){ alert(e.message); btn.disabled=false; btn.textContent="ارسال تیکت به عضو"; }
+}
+
+function logout(){
+  localStorage.removeItem("yanker_admin_token");
+  token="";
+  showLogin();
+  $("loginMsg").innerHTML="";
+}
+
+document.addEventListener("DOMContentLoaded",function(){
+  $("loginForm").addEventListener("submit",login);
+  $("logoutBtn")?.addEventListener("click",logout);
+  $("refreshBtn")?.addEventListener("click",load);
+  $("refreshTickets")?.addEventListener("click",load);
+  $("newAnnouncement")?.addEventListener("click",()=>$("announcementForm").classList.toggle("hidden"));
+  $("saveAnnouncement")?.addEventListener("click",saveAnnouncement);
+  $("sendMemberTicket")?.addEventListener("click",sendMemberTicket);
+  document.querySelectorAll(".ticket-filter-btn").forEach(b=>b.addEventListener("click",()=>{ticketFilter=b.dataset.ticketFilter;load();}));
+
+  if(token) load();
+  else showLogin();
+});
+})();
+</script></body></html>
