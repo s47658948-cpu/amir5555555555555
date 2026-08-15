@@ -261,7 +261,9 @@ export async function handler(event) {
       return reply(401, { ok:false, error:"نام کاربری یا رمز عبور اشتباه است." });
     }
 
-    if (event.httpMethod === "GET" && action === "members") return reply(200, { ok: true, members: await getMembers() });
+    if (event.httpMethod === "GET" && action === "members") return reply(200, {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."}); ok: true, members: await getMembers() });
 
     if (event.httpMethod === "GET" && action === "announcements") return reply(200, { ok: true, announcements: await getAnnouncements() });
 
@@ -291,6 +293,8 @@ export async function handler(event) {
     }
 
     if (event.httpMethod === "POST" && action === "ticket-create-admin") {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."});
       const username=normalizeUsername(body.username);
       const subject=String(body.subject||"").trim();
       const message=String(body.message||"").trim();
@@ -321,6 +325,8 @@ export async function handler(event) {
     }
 
     if (event.httpMethod === "POST" && action === "ticket-reply") {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."});
       const id=String(body.id||""), text=String(body.message||"").trim();
       const username=normalizeUsername(body.username);
 
@@ -385,7 +391,9 @@ export async function handler(event) {
       return reply(403, { ok: false, error: "این بخش فقط برای Owner در دسترس است." });
     }
 
-    if (event.httpMethod === "GET" && action === "requests") return reply(200, { ok: true, requests: await getRequestsFor() });
+    if (event.httpMethod === "GET" && action === "requests") return reply(200, {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."}); ok: true, requests: await getRequestsFor() });
 
     if (event.httpMethod === "GET" && action === "stats") {
       const requests = await getRequestsFor();
@@ -417,12 +425,18 @@ export async function handler(event) {
       const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه اطلاعیه نامعتبر است."});
       await db(`announcements?id=eq.${encodeURIComponent(id)}`,{method:"DELETE"}); return reply(200,{ok:true});
     }
-    if (event.httpMethod === "GET" && action === "tickets-admin") return reply(200,{ok:true,tickets:await getTickets()});
+    if (event.httpMethod === "GET" && action === "tickets-admin") return reply(200,{
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."});ok:true,tickets:await getTickets()});
     if (event.httpMethod === "POST" && action === "ticket-close") {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."});
       const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه تیکت نامعتبر است."});
       await db(`tickets?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({status:"closed",updated_at:Date.now()})}); return reply(200,{ok:true});
     }
     if (event.httpMethod === "POST" && action === "ticket-delete") {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."});
       const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه تیکت نامعتبر است."});
       const rows=await db(`tickets?id=eq.${encodeURIComponent(id)}&limit=1`);
       if(!rows?.length) return reply(404,{ok:false,error:"تیکت پیدا نشد."});
@@ -432,6 +446,8 @@ export async function handler(event) {
     }
 
     if (event.httpMethod === "POST" && action === "review") {
+      const actor = requireAdminActor(event);
+      if (!actor) return reply(401, {ok:false,error:"دسترسی مدیریت لازم است."});
       const id = String(body.id || "");
       const decision = body.decision;
       if (isMemberAdminToken(event) && decision !== "approve") {
@@ -478,12 +494,8 @@ export async function handler(event) {
       if (!rows?.length) return reply(404, { ok: false, error: "عضو پیدا نشد." });
       const targetRank = rankNumber(rows[0].rank);
       if (!actor.isOwner) {
-        if (targetRank >= 11) {
-          return reply(403, {ok:false,error:"اعضای رنک 11 تا 14 برای رنک 11+ قابل تغییر نیستند."});
-        }
-        if (rankNumber(rank) > 10) {
-          return reply(403, {ok:false,error:"رنک 11+ فقط می‌تواند رنک اعضای 1 تا 10 را مدیریت کند."});
-        }
+        if (targetRank >= 11) return reply(403, {ok:false,error:"اعضای رنک 11 تا 14 برای رنک 11+ قابل تغییر نیستند."});
+        if (rankNumber(rank) > 10) return reply(403, {ok:false,error:"رنک 11+ فقط می‌تواند اعضای رنک 1 تا 10 را مدیریت کند."});
       }
       const updated = await db(`members?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ rank }) });
       return reply(200, { ok: true, member: mapMember(updated?.[0] || { ...rows[0], rank }, false) });
