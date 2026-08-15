@@ -17,7 +17,7 @@
 </main></div></div>
 <script>
 'use strict';
-const API='/.netlify/functions/api', token=localStorage.getItem('yanker_member_admin_token')||'';let DATA={requests:[],members:[],tickets:[]},ticketTab='open';
+const API='/.netlify/functions/api'; let token=localStorage.getItem('yanker_member_admin_token')||'';let DATA={requests:[],members:[],tickets:[]},ticketTab='open';
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(action,method='GET',body=null){const h={Accept:'application/json',Authorization:'Bearer '+token};if(body!==null)h['Content-Type']='application/json';const r=await fetch(API+'?action='+encodeURIComponent(action),{method,headers:h,body:body===null?undefined:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'خطای سرور');return d}
 function activate(page){document.querySelectorAll('.nav[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.querySelectorAll('.section').forEach(x=>x.classList.toggle('active',x.dataset.section===page))}
@@ -33,5 +33,5 @@ async function replyTicket(id){const message=prompt('پاسخ شما:');if(!mess
 async function closeTicket(id){if(!confirm('این تیکت بسته شود؟ سابقه گفتگو حذف نمی‌شود.'))return;try{await api('ticket-close','POST',{id});await load()}catch(e){alert(e.message)}}
 async function deleteTicket(id){if(!confirm('تیکت و تمام پیام‌های آن برای همیشه حذف شود؟'))return;try{await api('ticket-delete','POST',{id});await load()}catch(e){alert(e.message)}}
 $('sendTicket').onclick=async()=>{const username=$('ticketMember').value,subject=$('ticketSubject').value.trim(),message=$('ticketBody').value.trim();if(!username||!subject||!message)return alert('اطلاعات تیکت را کامل کنید.');const b=$('sendTicket');b.disabled=true;b.textContent='در حال ارسال...';try{await api('ticket-create-admin','POST',{username,subject,message});$('ticketSubject').value='';$('ticketBody').value='';await load()}catch(e){alert(e.message)}finally{b.disabled=false;b.textContent='ارسال تیکت'}};$('refresh').onclick=()=>load().catch(e=>alert(e.message));
-(async()=>{if(!token){alert('دسترسی این پنل فقط برای رنک 11+ است.');return}try{await api('tickets-admin');await load()}catch(e){localStorage.removeItem('yanker_member_admin_token');document.body.innerHTML='<div style="padding:60px;text-align:center;color:white;font-family:Tahoma">دسترسی رد شد.<br><small style="color:#8997b2">این پنل فقط برای عضو رنک 11 به بالا قابل استفاده است.</small></div>'}})();
+(async()=>{token=localStorage.getItem('yanker_member_admin_token')||'';if(!token){alert('دسترسی این پنل فقط برای رنک 11+ است.');return}try{await api('tickets-admin');await load()}catch(e){localStorage.removeItem('yanker_member_admin_token');document.body.innerHTML='<div style="padding:60px;text-align:center;color:white;font-family:Tahoma">دسترسی رد شد.<br><small style="color:#8997b2">این پنل فقط برای عضو رنک 11 به بالا قابل استفاده است.</small></div>'}})();
 </script></body></html>

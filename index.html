@@ -507,7 +507,18 @@ const ROLE_LABEL = { user:"کاربر", member:"عضو", moderator:"مدیر ا�
   }
   function canManageByRank(){
     const member=getCurrentMemberRecord();
-    return !!member && Number(normalizeRank(member.rank))>=11;
+    if(member && Number(normalizeRank(member.rank))>=11) return true;
+
+    // Fallback for freshly restored sessions: the API-issued member_admin
+    // token contains the member's rank. This is only a UI convenience;
+    // every protected API action is still verified server-side.
+    try{
+      const raw=localStorage.getItem("yanker_member_admin_token")||"";
+      const encoded=raw.split(".")[0];
+      if(!encoded) return false;
+      const payload=JSON.parse(atob(encoded.replace(/-/g,"+").replace(/_/g,"/")));
+      return payload.role==="member_admin" && Number(payload.rank)>=11 && Number(payload.exp)>Date.now();
+    }catch(e){ return false; }
   }
 
 function normalizeRoute(value){
@@ -905,6 +916,8 @@ async function handleLogin(e){
   if(!username||!password){ STATE.authError="نام کاربری و رمز عبور را وارد کنید."; render(); return; }
 
   STATE.authError="";
+  // Never reuse an old member-admin token from another account.
+  localStorage.removeItem("yanker_member_admin_token");
   const button=f.querySelector('button[type="submit"]');
   if(button){ button.disabled=true; button.textContent="در حال ورود..."; }
   try{
@@ -952,6 +965,7 @@ async function handleLogout(){
   STATE.user = null;
   STATE.requests = [];
   STATE.tickets = [];
+  localStorage.removeItem("yanker_member_admin_token");
   STATE.authError = "";
   STATE.authNotice = "";
   STATE.joinError = "";
@@ -2096,6 +2110,7 @@ window.openEmbeddedAdmin=function(){
     alert("فقط اعضای رنک 11 تا 14 به پنل مدیریت دسترسی دارند.");
     return;
   }
+  frame.src="/member-admin.html?v="+Date.now();
   o.style.display="block";
   document.body.style.overflow="hidden";
   frame.style.display="block";
