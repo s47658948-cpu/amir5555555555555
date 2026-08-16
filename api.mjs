@@ -54,7 +54,7 @@ function checkToken(event) {
     const expected = crypto.createHmac("sha256", SESSION_SECRET).update(encoded).digest("base64url");
     if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-    return (payload.role === "owner" || (payload.role === "member_admin" && Number(payload.rank) >= 11)) && payload.exp > Date.now();
+    return (payload.role === "owner" || (payload.role === "member_admin" && Number(payload.rank) >= 10)) && payload.exp > Date.now();
   } catch { return false; }
 }
 
@@ -65,7 +65,7 @@ function isOwnerToken(event) {
 
 function isMemberAdminToken(event) {
   const payload = getTokenPayload(event);
-  return !!payload && payload.role === "member_admin" && Number(payload.rank) >= 11;
+  return !!payload && payload.role === "member_admin" && Number(payload.rank) >= 10;
 }
 
 function requireOwner(event) {
@@ -76,7 +76,7 @@ function getAdminActor(event) {
   const payload = getTokenPayload(event);
   if (!payload) return null;
   if (payload.role === "owner") return { ...payload, isOwner: true };
-  if (payload.role === "member_admin" && Number(payload.rank) >= 11) return { ...payload, isOwner: false };
+  if (payload.role === "member_admin" && Number(payload.rank) >= 10) return { ...payload, isOwner: false };
   return null;
 }
 
@@ -162,7 +162,7 @@ function mapAnnouncement(a){
   return { id:a.id, title:a.title||"", body:a.body||"", author:a.author||"", date:Number(a.created_at||0), published:a.published!==false };
 }
 function mapTicket(t, messages=[]){
-  return { id:t.id, username:t.username||"", name:t.name||"", subject:t.subject||"", status:t.status||"open", createdAt:Number(t.created_at||0), updatedAt:Number(t.updated_at||t.created_at||0), messages };
+  return { id:t.id, username:t.username||"", name:t.name||"", subject:t.subject||"", category:t.category||"member", status:t.status||"open", createdAt:Number(t.created_at||0), updatedAt:Number(t.updated_at||t.created_at||0), messages };
 }
 function mapTicketMessage(m){
   return { id:m.id, ticketId:m.ticket_id, sender:m.sender||"user", senderName:m.sender_name||"", body:m.body||"", createdAt:Number(m.created_at||0) };
@@ -236,12 +236,23 @@ export async function handler(event) {
       const rows = await db(`members?username=eq.${encodeURIComponent(username)}&password_hash=eq.${encodeURIComponent(passwordHash)}&limit=1`);
       if (!rows?.length) return reply(401, { ok: false, error: "نام کاربری یا رمز عبور اشتباه است." });
       const member = mapMember(rows[0], false);
-      const adminToken = rankNumber(member.rank) >= 11 ? makeToken("member_admin", member.username, member.rank) : null;
+      const adminToken = rankNumber(member.rank) >= 10 ? makeToken("member_admin", member.username, member.rank) : null;
       return reply(200, { ok: true, member, adminToken });
     }
 
     // User login works across devices by checking the persistent member/request records.
     // This is a fallback for accounts whose old localStorage user record is missing.
+    if (event.httpMethod === "POST" && action === "user-register") {
+      const username=normalizeUsername(body.username), displayName=String(body.displayName||"").trim(), passwordHash=String(body.passwordHash||"").trim();
+      if(!username||!displayName||!passwordHash) return reply(400,{ok:false,error:"اطلاعات ثبت‌نام کامل نیست."});
+      const exists=await db(`site_users?username=eq.${encodeURIComponent(username)}&limit=1`);
+      const member=await db(`members?username=eq.${encodeURIComponent(username)}&limit=1`);
+      if(exists?.length||member?.length) return reply(409,{ok:false,error:"این نام کاربری قبلاً ثبت شده است."});
+      const row={id:crypto.randomUUID(),username,display_name:displayName,password_hash:passwordHash,role:"user",created_at:Date.now()};
+      const out=await db("site_users",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(row)});
+      return reply(201,{ok:true,user:{id:row.id,username,displayName,role:"user",createdAt:row.created_at}});
+    }
+
     if (event.httpMethod === "POST" && action === "user-login") {
       const username = normalizeUsername(body.username);
       const passwordHash = crypto.createHash("sha256").update(String(body.password || "")).digest("hex");
@@ -250,8 +261,13 @@ export async function handler(event) {
       if (members?.length) {
         const m = members[0];
         const member = mapMember(m,false);
-        const adminToken = rankNumber(member.rank) >= 11 ? makeToken("member_admin", member.username, member.rank) : null;
+        const adminToken = rankNumber(member.rank) >= 10 ? makeToken("member_admin", member.username, member.rank) : null;
         return reply(200, { ok:true, user:{ username:m.username, displayName:m.name || m.username, role:"member" }, member, adminToken });
+      }
+      const siteUsers = await db(`site_users?username=eq.${encodeURIComponent(username)}&password_hash=eq.${encodeURIComponent(passwordHash)}&limit=1`);
+      if(siteUsers?.length){
+        const u=siteUsers[0];
+        return reply(200,{ok:true,user:{username:u.username,displayName:u.display_name||u.username,role:"user"}});
       }
       const requests = await db(`requests?username=eq.${encodeURIComponent(username)}&password_hash=eq.${encodeURIComponent(passwordHash)}&order=created_at.desc&limit=1`);
       if (requests?.length) {
@@ -268,9 +284,18 @@ export async function handler(event) {
     if (event.httpMethod === "POST" && action === "ticket-create") {
       const username = normalizeUsername(body.username);
       const name = String(body.name || "").trim();
-      const subject = String(body.subject || "").trim();
+      let subject = String(body.subject || "").trim();
       const message = String(body.message || "").trim();
-      if(!username || !name || !subject || !message) return reply(400,{ok:false,error:"اطلاعات تیکت کامل نیست."});
+      if(!username || !name || !message) return reply(400,{ok:false,error:"اطلاعات تیکت کامل نیست."});
+      const memberRows = await db(`members?username=eq.${encodeURIComponent(username)}&limit=1`);
+      const requestRows = await db(`requests?username=eq.${encodeURIComponent(username)}&order=created_at.desc&limit=1`);
+      const userRows = await db(`site_users?username=eq.${encodeURIComponent(username)}&limit=1`);
+      const isMember = !!memberRows?.length;
+      const isRegistered = isMember || !!requestRows?.length || !!userRows?.length;
+      if(!isRegistered) return reply(403,{ok:false,error:"ابتدا در سایت ثبت‌نام کنید."});
+      const category = isMember ? "member" : "cafe";
+      if(category === "cafe") subject = "کافه";
+      if(!subject) return reply(400,{ok:false,error:"موضوع تیکت الزامی است."});
 
       // Anti-spam cooldown: each user can open a new ticket only 10 seconds
       // after their most recently created ticket (including tickets sent by admin).
@@ -283,7 +308,7 @@ export async function handler(event) {
       }
 
       const id=crypto.randomUUID();
-      const ticket={id,username,name,subject,status:"open",created_at:now,updated_at:now};
+      const ticket={id,username,name,subject,category,status:"open",created_at:now,updated_at:now};
       await db("tickets",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(ticket)});
       await db("ticket_messages",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({id:crypto.randomUUID(),ticket_id:id,sender:"user",sender_name:name,body:message,created_at:now})});
       const tickets=await getTickets(username);
@@ -299,7 +324,7 @@ export async function handler(event) {
       if(!members?.length) return reply(404,{ok:false,error:"عضو موردنظر پیدا نشد."});
       const member=members[0];
       const now=Date.now(), id=crypto.randomUUID();
-      const ticket={id,username:member.username,name:member.name||member.username,subject,status:"answered",created_at:now,updated_at:now};
+      const ticket={id,username:member.username,name:member.name||member.username,subject,category:"member",status:"answered",created_at:now,updated_at:now};
       await db("tickets",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(ticket)});
       await db("ticket_messages",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({id:crypto.randomUUID(),ticket_id:id,sender:"admin",sender_name:ADMIN_USER,body:message,created_at:now})});
       const tickets=await getTickets(member.username);
@@ -358,7 +383,11 @@ export async function handler(event) {
         return reply(200,{ok:true,ticket:(await getTickets(username))[0]});
       }
 
-      // پاسخ مدیریت
+      // پاسخ مدیریت: تیکت‌های کافه فقط برای Rank 12+
+      const actor=getAdminActor(event);
+      if(!actor) return reply(401,{ok:false,error:"دسترسی مدیریت لازم است."});
+      if(!actor.isOwner && Number(actor.rank)<11) return reply(403,{ok:false,error:"پاسخ‌گویی تیکت‌ها از رنک 11 به بالا است."});
+      if(ticket.category === "cafe" && !actor.isOwner && Number(actor.rank)<12) return reply(403,{ok:false,error:"تیکت‌های کافه فقط برای رنک 12 به بالا قابل مشاهده و پاسخ هستند."});
       await db("ticket_messages",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({
         id:crypto.randomUUID(),
         ticket_id:id,
@@ -374,7 +403,7 @@ export async function handler(event) {
 
     if (!checkToken(event)) return reply(401, { ok: false, error: "دسترسی مدیریت لازم است." });
 
-    // Rank 11+ members get a separate, passwordless admin panel.
+    // Rank 10+ members get a separate, passwordless admin panel.
     // Their scope is intentionally limited to tickets, membership approval/deletion,
     // and assigning ranks up to 6. Owner keeps full access to the original panel.
     const ownerOnlyActions = new Set([
@@ -383,6 +412,10 @@ export async function handler(event) {
     ]);
     if (isMemberAdminToken(event) && ownerOnlyActions.has(action)) {
       return reply(403, { ok: false, error: "این بخش فقط برای Owner در دسترس است." });
+    }
+
+    if (isMemberAdminToken(event) && Number(getTokenPayload(event)?.rank||0)<11 && !["penalties","penalty-create","penalty-delete"].includes(action)) {
+      return reply(403,{ok:false,error:"رنک 10 فقط به پنل جریمه‌ها دسترسی دارد."});
     }
 
     if (event.httpMethod === "GET" && action === "requests") return reply(200, { ok: true, requests: await getRequestsFor() });
@@ -417,15 +450,26 @@ export async function handler(event) {
       const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه اطلاعیه نامعتبر است."});
       await db(`announcements?id=eq.${encodeURIComponent(id)}`,{method:"DELETE"}); return reply(200,{ok:true});
     }
-    if (event.httpMethod === "GET" && action === "tickets-admin") return reply(200,{ok:true,tickets:await getTickets()});
+    if (event.httpMethod === "GET" && action === "tickets-admin") {
+      const actor=getAdminActor(event);
+      if(!actor) return reply(401,{ok:false,error:"دسترسی مدیریت لازم است."});
+      const all=await getTickets();
+      const visible=actor.isOwner ? all : all.filter(t=>t.category !== "cafe" || Number(actor.rank)>=12);
+      return reply(200,{ok:true,tickets:visible});
+    }
     if (event.httpMethod === "POST" && action === "ticket-close") {
       const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه تیکت نامعتبر است."});
+      const actor=getAdminActor(event); const rows=await db(`tickets?id=eq.${encodeURIComponent(id)}&limit=1`);
+      if(!rows?.length) return reply(404,{ok:false,error:"تیکت پیدا نشد."});
+      if(!actor?.isOwner && rows[0].category==="cafe" && Number(actor?.rank)<12) return reply(403,{ok:false,error:"دسترسی تیکت کافه فقط برای رنک 12+ است."});
       await db(`tickets?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({status:"closed",updated_at:Date.now()})}); return reply(200,{ok:true});
     }
     if (event.httpMethod === "POST" && action === "ticket-delete") {
       const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه تیکت نامعتبر است."});
       const rows=await db(`tickets?id=eq.${encodeURIComponent(id)}&limit=1`);
       if(!rows?.length) return reply(404,{ok:false,error:"تیکت پیدا نشد."});
+      const actor=getAdminActor(event);
+      if(!actor?.isOwner && rows[0].category==="cafe" && Number(actor?.rank)<12) return reply(403,{ok:false,error:"دسترسی تیکت کافه فقط برای رنک 12+ است."});
       await db(`ticket_messages?ticket_id=eq.${encodeURIComponent(id)}`,{method:"DELETE"});
       await db(`tickets?id=eq.${encodeURIComponent(id)}`,{method:"DELETE"});
       return reply(200,{ok:true});
@@ -504,6 +548,27 @@ export async function handler(event) {
       if (!actor.isOwner && rankNumber(rows[0].rank) >= 11) return reply(403, {ok:false,error:"اعضای رنک 11 به بالا قابل حذف یا تغییر نیستند."});
       await db(`members?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
       return reply(200, { ok: true });
+    }
+
+
+    if (event.httpMethod === "GET" && action === "penalties") {
+      const actor=getAdminActor(event); if(!actor || (!actor.isOwner && Number(actor.rank)<10)) return reply(403,{ok:false,error:"پنل جریمه فقط برای رنک 10 به بالا است."});
+      const rows=await db("penalties?select=*&order=created_at.desc");
+      return reply(200,{ok:true,penalties:(rows||[]).map(p=>({id:p.id,username:p.username||"",name:p.name||"",reason:p.reason||"",amount:Number(p.amount||0),createdAt:Number(p.created_at||0),issuedBy:p.issued_by||""}))});
+    }
+    if (event.httpMethod === "POST" && action === "penalty-create") {
+      const actor=getAdminActor(event); if(!actor || (!actor.isOwner && Number(actor.rank)<10)) return reply(403,{ok:false,error:"پنل جریمه فقط برای رنک 10 به بالا است."});
+      const username=normalizeUsername(body.username), reason=String(body.reason||"").trim(), amount=Number(body.amount)||0;
+      if(!username||!reason) return reply(400,{ok:false,error:"عضو و دلیل جریمه الزامی است."});
+      const rows=await db(`members?username=eq.${encodeURIComponent(username)}&limit=1`); if(!rows?.length) return reply(404,{ok:false,error:"عضو تأییدشده پیدا نشد."});
+      const row={id:crypto.randomUUID(),username,name:rows[0].name||username,reason,amount,issued_by:actor.username||ADMIN_USER,created_at:Date.now()};
+      const out=await db("penalties",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(row)});
+      return reply(201,{ok:true,penalty:out?.[0]||row});
+    }
+    if (event.httpMethod === "POST" && action === "penalty-delete") {
+      const actor=getAdminActor(event); if(!actor || (!actor.isOwner && Number(actor.rank)<10)) return reply(403,{ok:false,error:"پنل جریمه فقط برای رنک 10 به بالا است."});
+      const id=String(body.id||""); if(!id) return reply(400,{ok:false,error:"شناسه جریمه نامعتبر است."});
+      await db(`penalties?id=eq.${encodeURIComponent(id)}`,{method:"DELETE"}); return reply(200,{ok:true});
     }
 
     return reply(404, { ok: false, error: "مسیر پیدا نشد." });

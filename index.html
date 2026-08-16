@@ -513,7 +513,7 @@ const ROLE_LABEL = { user:"کاربر", member:"عضو", moderator:"مدیر ا�
   }
   function canManageByRank(){
     const member=getCurrentMemberRecord();
-    if(member && Number(normalizeRank(member.rank))>=11) return true;
+    if(member && Number(normalizeRank(member.rank))>=10) return true;
 
     // Fallback for freshly restored sessions: the API-issued member_admin
     // token contains the member's rank. This is only a UI convenience;
@@ -523,7 +523,7 @@ const ROLE_LABEL = { user:"کاربر", member:"عضو", moderator:"مدیر ا�
       const encoded=raw.split(".")[0];
       if(!encoded) return false;
       const payload=JSON.parse(atob(encoded.replace(/-/g,"+").replace(/_/g,"/")));
-      return payload.role==="member_admin" && Number(payload.rank)>=11 && Number(payload.exp)>Date.now();
+      return payload.role==="member_admin" && Number(payload.rank)>=10 && Number(payload.exp)>Date.now();
     }catch(e){ return false; }
   }
 
@@ -599,7 +599,7 @@ function statusBadge(status){
   return `<span class="status-badge ${m.cls}"><span class="status-badge-icon">${m.icon}</span>${m.label}</span>`;
 }
 function avatarUrl(seed){
-  return "https://api.dicebear.com/7.x/adventurer/svg?seed=" + encodeURIComponent(seed) + "&backgroundType=gradientLinear&backgroundColor=13245e,2f5bff";
+  return "https://api.dicebear.com/9.x/adventurer/svg?seed="+encodeURIComponent(String(seed||"member"))+"&gender=male&backgroundColor=0b1220";
 }
 function logActivity(text){
   STATE.activity.unshift({ id: uid(), text, ts: Date.now(), actor: STATE.user ? STATE.user.username : "سیستم" });
@@ -784,7 +784,7 @@ async function refreshAnnouncements(){
 }
 
 async function refreshTickets(){
-  if(!STATE.user || !STATE.user.username || !hasApprovedMembership()){ STATE.tickets=[]; STATE.unreadTicketCount=0; return []; }
+  if(!STATE.user || !STATE.user.username){ STATE.tickets=[]; STATE.unreadTicketCount=0; return []; }
   try{
     const r=await yankerApi("tickets");
     const oldTickets=STATE.tickets||[];
@@ -835,9 +835,12 @@ function requestTicketNotifications(){
 let ticketCooldownUntil=0;
 async function createTicket(e){
   e.preventDefault();
-  if(!hasApprovedMembership()){ alert("فقط اعضایی که درخواست عضویتشان تأیید شده است می‌توانند تیکت ارسال کنند."); return; }
-  const f=e.target, subject=f.subject.value.trim(), message=f.message.value.trim();
-  if(!subject||!message) return;
+  if(!STATE.user){ alert("ابتدا وارد حساب شوید."); return; }
+  const f=e.target, message=f.message.value.trim();
+  let subject=f.subject.value.trim();
+  const approved=hasApprovedMembership();
+  if(!approved) subject="کافه";
+  if(!message) return;
   const button=f.querySelector('button[type="submit"]');
   if(Date.now()<ticketCooldownUntil){ updateTicketCooldown(button); return; }
   try{
@@ -860,25 +863,17 @@ function updateTicketCooldown(button){
   if(left>0) setTimeout(()=>updateTicketCooldown(button),1000);
 }
 async function replyOwnTicket(id){
-  const text=prompt("پیام برای مدیریت:");
-  if(!text || !text.trim()) return;
-  try{
-    await yankerApi("ticket-reply","POST",{
-      id,
-      message:text.trim(),
-      username:STATE.user.username
-    });
-    await refreshTickets();
-    render();
-  }catch(e){
-    alert(e.message);
-  }
+  const box=document.getElementById("ticket-reply-"+id);
+  const text=box?.value.trim();
+  if(!text) return;
+  try{ await yankerApi("ticket-reply","POST",{id,message:text,username:STATE.user.username}); await refreshTickets(); render(); }catch(e){ alert(e.message); }
 }
 
 async function closeOwnTicket(id){
   if(!confirm("این تیکت بسته شود؟ پیام‌ها و سابقه گفتگو حفظ می‌شوند.")) return;
   try{ await yankerApi("ticket-close-own","POST",{id,username:STATE.user.username}); await refreshTickets(); render(); }catch(e){ alert(e.message); }
 }
+async function replyAdminInline(id){const box=document.getElementById("admin-reply-"+id);const message=box?.value.trim();if(!message)return;try{await yankerApi("ticket-reply","POST",{id,message});await loadTicketsAdmin();render()}catch(e){alert(e.message)}}
 async function replyTicket(id){
   const text=prompt("پاسخ مدیریت:"); if(!text || !text.trim()) return;
   try{ await yankerApi("ticket-reply","POST",{id,message:text.trim()}); await loadTicketsAdmin(); render(); }catch(e){ alert(e.message); }
@@ -929,7 +924,7 @@ window.addEventListener("hashchange",()=>{
 let __ticketPollTimer=null;
 function startTicketPolling(){
   clearInterval(__ticketPollTimer);
-  if(!STATE.user || !hasApprovedMembership()) return;
+  if(!STATE.user) return;
   __ticketPollTimer=setInterval(async()=>{
     try{ await refreshTickets(); render(); }catch(e){}
   },20000);
@@ -958,6 +953,7 @@ async function handleRegister(e){
   if(STATE.users.find(u=>u.username===username)){ STATE.authError = "این نام کاربری قبلاً ثبت شده است."; render(); return; }
 
   const passwordHash = await sha256(password);
+  try{ await yankerApi("user-register","POST",{username,displayName,passwordHash}); }catch(err){ STATE.authError=err.message; render(); return; }
   const newUser = { id: uid(), username, displayName, role:"user", passwordHash, createdAt: Date.now() };
   STATE.users.push(newUser);
   await saveUsers();
@@ -1209,7 +1205,7 @@ function navBar(){
     ["home","خانه"], ["rules","قوانین"],
     ...(hasApprovedMembership() ? [["members","اعضا"],["announcements","اطلاعیه‌ها"]] : []),
     ["join","درخواست عضویت"],
-    ...(hasApprovedMembership() ? [["tickets",`تیکت${STATE.unreadTicketCount>0?` <span class="ticket-unread-badge">${STATE.unreadTicketCount>99?"99+":STATE.unreadTicketCount}</span>`:""}`]] : [])
+    ...(STATE.user ? [["tickets",`تیکت${STATE.unreadTicketCount>0?` <span class="ticket-unread-badge">${STATE.unreadTicketCount>99?"99+":STATE.unreadTicketCount}</span>`:""}`]] : [])
   ];
   return `
   <div class="nav">
@@ -1634,8 +1630,15 @@ function viewProfile(){
 
 function viewTickets(){
   if(!STATE.user) return `<div class="center-hint"><p>برای ارتباط با مدیریت ابتدا وارد شوید.</p><button class="btn btn-primary" onclick="nav('login')">ورود</button></div>`;
-  if(!hasApprovedMembership()) return membershipGateHtml("مرکز تیکت برای اعضای تأییدشده است","بعد از تأیید درخواست عضویت، بخش تیکت برای حساب شما فعال می‌شود.");
+  const approved=hasApprovedMembership();
   const tickets=STATE.tickets||[];
+  if(!approved){
+    const cafeTickets=tickets.filter(t=>(t.category||"cafe")==="cafe");
+    const tab=STATE.ticketUserTab||"open";
+    const open=cafeTickets.filter(t=>t.status!=="closed"), closed=cafeTickets.filter(t=>t.status==="closed");
+    const visible=tab==="closed"?closed:open;
+    return `<div class="ticket-page"><div class="ticket-hero wrap"><div><div class="section-eyebrow">YANKER CAFE SUPPORT</div><h2 class="ticket-title">تیکت کافه</h2><p class="ticket-subtitle">این بخش مخصوص کاربران ثبت‌نام‌شده‌ای است که هنوز عضو تأییدشده نیستند.</p></div><div class="ticket-orb">☕<span>CAFE</span></div></div><div class="wrap"><div class="ticket-tabs"><button class="active">تیکت‌های کافه <b>${cafeTickets.length}</b></button></div><div class="ticket-layout"><div class="ticket-compose card"><div class="ticket-section-head"><div><span class="ticket-kicker">CAFE REQUEST</span><h3>ارسال تیکت کافه</h3></div><div class="ticket-icon">☕</div></div><p class="hint">عنوان این تیکت همیشه «کافه» است.</p><form onsubmit="createTicket(event)" class="ticket-form"><input type="hidden" name="subject" value="کافه"><label>پیام<textarea name="message" maxlength="3000" placeholder="متن درخواست خود را بنویسید..." required></textarea></label><div class="ticket-form-foot"><span class="ticket-note">این تیکت فقط توسط مدیریت/رنک 12+ قابل مشاهده و پاسخ است.</span><button class="btn btn-primary ticket-submit" type="submit">ارسال تیکت کافه</button></div></form></div><div class="ticket-list"><div class="ticket-section-head"><div><span class="ticket-kicker">MY CAFE TICKETS</span><h3>تیکت‌های کافه من</h3></div><button class="btn btn-sm btn-ghost" onclick="refreshTickets().then(render)">↻</button></div>${visible.length?visible.map(t=>ticketCard(t)).join(""): `<div class="ticket-empty"><div class="ticket-empty-icon">☕</div><h3>هنوز تیکت کافه‌ای ندارید</h3><p>درخواست خود را از پنل سمت چپ ارسال کنید.</p></div>`}</div></div></div></div>`;
+  }
   const tab=STATE.ticketUserTab||"open";
   const open=tickets.filter(t=>t.status!=='closed');
   const closed=tickets.filter(t=>t.status==='closed');
@@ -1680,16 +1683,9 @@ function viewTickets(){
   </div>`;
 }
 function ticketCard(t){
-  return `<div class="ticket-card ${t.status==='answered'?'is-answered':''} ${t.status==='closed'?'is-closed':''}">
-    <div class="ticket-card-top"><div><div class="ticket-subject">${esc(t.subject)}</div><div class="hint">${fmtDate(t.createdAt)}</div></div><span class="ticket-status ${t.status}">${t.status==='closed'?'بسته':t.status==='answered'?'پاسخ مدیریت':'در انتظار پاسخ'}</span></div>
-    <div class="ticket-thread">${t.messages.map(m=>`<div class="ticket-message ${m.sender==='admin'?'from-admin':'from-user'}"><div class="ticket-avatar">${m.sender==='admin'?'Y':'شما'}</div><div class="ticket-bubble"><div class="ticket-meta"><b>${esc(m.sender==='admin'?'مدیریت':m.senderName)}</b><small>${fmtDate(m.createdAt)}</small></div><div>${esc(m.body)}</div></div></div>`).join('')}</div>
-    ${t.status!=='closed'?`
-      <div class="ticket-actions">
-        <button class="btn btn-sm btn-primary" onclick="replyOwnTicket('${t.id}')">ارسال پیام به مدیریت</button>
-        <button class="btn btn-sm btn-ghost" onclick="closeOwnTicket('${t.id}')">✓ بستن تیکت</button>
-      </div>
-    `:`<span class="hint">این تیکت بسته شده؛ پیام‌ها و سابقه گفتگو حفظ شده‌اند.</span>`}
-  </div>`;
+  const messages=(t.messages||[]).map(m=>`<div class="ticket-message ${m.sender==='admin'?'from-admin':''}"><div class="ticket-avatar">${m.sender==='admin'?'Y':'شما'}</div><div class="ticket-bubble"><div class="ticket-meta"><b>${esc(m.sender==='admin'?'مدیریت':m.senderName)}</b><small>${fmtDate(m.createdAt)}</small></div>${esc(m.body)}</div></div>`).join('');
+  const reply=t.status!=='closed'?`<div class="ticket-inline-reply"><textarea id="ticket-reply-${esc(t.id)}" maxlength="3000" placeholder="پیام خود را داخل همین تیکت بنویسید..."></textarea><button class="btn btn-sm btn-primary" onclick="replyOwnTicket('${esc(t.id)}')">ارسال پیام</button></div>`:'';
+  return `<div class="card ticket-card ${t.status==='closed'?'is-closed':''}"><div class="ticket-card-top"><div><div class="ticket-subject">${esc(t.subject||'کافه')}</div><div class="hint">${t.category==='cafe'?'☕ تیکت کافه':'تیکت عضو'} · ${fmtDate(t.updatedAt)}</div></div><span class="ticket-status ${esc(t.status)}">${t.status==='closed'?'بسته':t.status==='answered'?'پاسخ داده شده':'باز'}</span></div><div class="ticket-thread">${messages}</div>${reply}<div class="row-actions">${t.status!=='closed'?`<button class="btn btn-sm btn-ghost" onclick="closeOwnTicket('${esc(t.id)}')">✓ بستن تیکت</button>`:`<span class="hint">سابقه گفتگو حفظ شده است.</span>`}</div></div>`;
 }
 
 /* ---------- ADMIN ---------- */
@@ -2026,14 +2022,15 @@ function announcementModal(id){
 
 function adminTickets(){
   const list=(STATE.tickets||[]).slice().sort((a,b)=>b.updatedAt-a.updatedAt), tab=STATE.ticketAdminTab||"open";
-  const open=list.filter(t=>t.status!=="closed"), closed=list.filter(t=>t.status==="closed"), visible=tab==="closed"?closed:open;
-  const members=STATE.members||[];
-  return `<div class="admin-ticket-dashboard"><div class="banner admin-ticket-banner"><div><span class="ticket-kicker">SUPPORT CONTROL</span><h2 style="margin:4px 0">مرکز تیکت</h2><span class="muted">خلوت، دسته‌بندی‌شده و سریع.</span></div><button class="btn btn-sm btn-ghost" onclick="loadTicketsAdmin().then(render)">↻</button></div>
-  <div class="admin-ticket-mini-stats"><button class="admin-ticket-mini ${tab==='open'?'active':''}" onclick="STATE.ticketAdminTab='open';render()"><span>فعال</span><b>${open.length}</b></button><button class="admin-ticket-mini ${tab==='closed'?'active':''}" onclick="STATE.ticketAdminTab='closed';render()"><span>بسته‌شده</span><b>${closed.length}</b></button><div class="admin-ticket-mini"><span>کل</span><b>${list.length}</b></div></div>
-  ${tab==='open'?`<div class="card admin-send-ticket"><div class="ticket-section-head"><div><span class="ticket-kicker">DIRECT MESSAGE</span><h3>ارسال تیکت برای عضو</h3></div><div class="ticket-icon">✦</div></div><form onsubmit="sendTicketToMember(event)" class="admin-ticket-form-grid"><label>عضو<select name="username" required>${members.map(m=>`<option value="${esc(m.username||'')}">${esc(m.name)} — @${esc(m.username||'')}</option>`).join('')||'<option>عضوی وجود ندارد</option>'}</select></label><label>موضوع<input name="subject" maxlength="120" required></label><label class="full">متن<textarea name="message" maxlength="3000" required></textarea></label><button class="btn btn-primary" type="submit">ارسال به عضو</button></form></div>`:""}
-  <div class="section-head" style="margin-top:26px"><h3 class="section-title" style="font-size:22px">${tab==='closed'?'تیکت‌های بسته‌شده':'تیکت‌های فعال'}</h3></div>
-  <div class="grid-2">${visible.length?visible.map(t=>`<div class="card admin-ticket-card"><div class="row"><div><h3>${esc(t.subject)}</h3><div class="hint">${esc(t.name)} · @${esc(t.username)} · ${fmtDate(t.updatedAt)}</div></div><span class="ticket-status ${t.status}">${t.status==='closed'?'بسته':t.status==='answered'?'پاسخ داده شده':'باز'}</span></div><div class="ticket-thread" style="max-height:320px;overflow:auto">${t.messages.map(m=>`<div class="ticket-message ${m.sender==='admin'?'from-admin':''}"><div class="ticket-avatar">${m.sender==='admin'?'Y':'شما'}</div><div class="ticket-bubble"><div class="ticket-meta"><b>${esc(m.sender==='admin'?'مدیریت':m.senderName)}</b><small>${fmtDate(m.createdAt)}</small></div>${esc(m.body)}</div></div>`).join('')}</div><div class="row-actions">${t.status!=='closed'?`<button class="btn btn-sm btn-primary" onclick="replyTicket('${t.id}')">پاسخ</button><button class="btn btn-sm btn-ghost" onclick="closeTicket('${t.id}')">✓ بستن</button>`:`<span class="hint">سابقه گفتگو حفظ شده است.</span>`}<button class="btn btn-sm btn-danger" onclick="deleteTicketAdmin('${t.id}')">حذف تیکت</button></div></div>`).join(''):`<div class="empty-state">تیکتی وجود ندارد.</div>`}</div></div>`;
+  const open=list.filter(t=>t.status!=="closed" && t.category!=="cafe"), closed=list.filter(t=>t.status==="closed" && t.category!=="cafe"), cafes=list.filter(t=>t.category==="cafe");
+  const visible=tab==="closed"?closed:tab==="cafe"?cafes:open;
+  return `<div class="admin-ticket-dashboard"><div class="banner admin-ticket-banner"><div><span class="ticket-kicker">SUPPORT CONTROL</span><h2 style="margin:4px 0">مرکز تیکت</h2><span class="muted">تیکت اعضا و کافه کاملاً جدا.</span></div><button class="btn btn-sm btn-ghost" onclick="loadTicketsAdmin().then(render)">↻</button></div>
+  <div class="admin-ticket-mini-stats"><button class="admin-ticket-mini ${tab==='open'?'active':''}" onclick="STATE.ticketAdminTab='open';render()"><span>تیکت اعضا</span><b>${open.length}</b></button><button class="admin-ticket-mini ${tab==='cafe'?'active':''}" onclick="STATE.ticketAdminTab='cafe';render()"><span>☕ کافه</span><b>${cafes.length}</b></button><button class="admin-ticket-mini ${tab==='closed'?'active':''}" onclick="STATE.ticketAdminTab='closed';render()"><span>بسته‌شده</span><b>${closed.length}</b></button></div>
+  ${tab!=='cafe'&&tab!=='closed'?`<div class="card admin-send-ticket"><div class="ticket-section-head"><div><span class="ticket-kicker">DIRECT MESSAGE</span><h3>ارسال تیکت برای عضو</h3></div><div class="ticket-icon">✦</div></div><form onsubmit="sendTicketToMember(event)" class="admin-ticket-form-grid"><label>عضو<select name="username" required>${(STATE.members||[]).map(m=>`<option value="${esc(m.username||'')}">${esc(m.name)} — @${esc(m.username||'')}</option>`).join('')||'<option>عضوی وجود ندارد</option>'}</select></label><label>موضوع<input name="subject" maxlength="120" required></label><label class="full">متن<textarea name="message" maxlength="3000" required></textarea></label><button class="btn btn-primary" type="submit">ارسال به عضو</button></form></div>`:""}
+  <div class="section-head" style="margin-top:26px"><h3 class="section-title" style="font-size:22px">${tab==='cafe'?'تیکت‌های کافه':tab==='closed'?'تیکت‌های بسته‌شده':'تیکت‌های اعضا'}</h3></div>
+  <div class="grid-2">${visible.length?visible.map(t=>`<div class="card admin-ticket-card"><div class="row"><div><h3>${esc(t.subject||'کافه')}</h3><div class="hint">${t.category==='cafe'?'☕ تیکت کافه':'تیکت عضو'} · ${esc(t.name)} · @${esc(t.username)} · ${fmtDate(t.updatedAt)}</div></div><span class="ticket-status ${t.status}">${t.status==='closed'?'بسته':t.status==='answered'?'پاسخ داده شده':'باز'}</span></div><div class="ticket-thread" style="max-height:320px;overflow:auto">${(t.messages||[]).map(m=>`<div class="ticket-message ${m.sender==='admin'?'from-admin':''}"><div class="ticket-avatar">${m.sender==='admin'?'Y':'شما'}</div><div class="ticket-bubble"><div class="ticket-meta"><b>${esc(m.sender==='admin'?'مدیریت':m.senderName)}</b><small>${fmtDate(m.createdAt)}</small></div>${esc(m.body)}</div></div>`).join('')}</div>${t.status!=='closed'?`<div class="ticket-inline-reply"><textarea id="admin-reply-${esc(t.id)}" maxlength="3000" placeholder="پاسخ را داخل همین تیکت بنویسید..."></textarea><button class="btn btn-sm btn-primary" onclick="replyAdminInline('${esc(t.id)}')">ارسال پاسخ</button></div><div class="row-actions"><button class="btn btn-sm btn-ghost" onclick="closeTicket('${esc(t.id)}')">✓ بستن</button></div>`:`<span class="hint">سابقه گفتگو حفظ شده است.</span>`}</div>`).join(''):`<div class="empty-state">تیکتی وجود ندارد.</div>`}</div></div>`;
 }
+
 function adminRules(){
   return `
   <div class="card" style="margin-bottom:20px;">
@@ -2155,6 +2152,7 @@ function demoBanner(){
 .admin-overlay iframe{display:block;width:100%;height:calc(100vh - 40px);max-width:1600px;margin:auto;border:1px solid #263149;border-radius:20px;background:#080b12;box-shadow:0 30px 100px rgba(0,0,0,.6)}
 .admin-close{position:fixed;top:28px;left:28px;z-index:100001;border:1px solid #3a4864;background:#121a2a;color:#fff;border-radius:10px;padding:9px 13px;cursor:pointer}
 
+.ticket-inline-reply{display:grid;gap:8px;margin-top:12px}.ticket-inline-reply textarea{width:100%;min-height:90px;padding:10px;background:rgba(5,10,22,.7);color:var(--text);border:1px solid var(--border);border-radius:11px;resize:vertical}
 </style>
 <div id="embeddedAdminOverlay" class="admin-overlay" style="display:none">
   <button class="admin-close" onclick="closeEmbeddedAdmin()">✕ بستن پنل</button>
@@ -2166,7 +2164,7 @@ window.openEmbeddedAdmin=function(){
   var frame=document.getElementById("embeddedAdminFrame");
   if(!o || !frame) return;
   if(typeof canManageByRank==="function" && !canManageByRank()){
-    alert("فقط اعضای رنک 11 تا 14 به پنل مدیریت دسترسی دارند.");
+    alert("فقط اعضای رنک 10 تا 14 به پنل مدیریت دسترسی دارند.");
     return;
   }
   frame.src="/member-admin.html?v="+Date.now();
