@@ -533,6 +533,12 @@ function normalizeRoute(value){
   return allowed.includes(raw)?raw:"home";
 }
 
+// The real management panel is a separate protected page. Keep #/admin from
+// rendering a broken SPA route and always send the user to the password gate.
+function openAdminLogin(){
+  window.location.href = './admin.html';
+}
+
 let STATE = {
   route: normalizeRoute(location.hash),
   user: null,
@@ -1216,7 +1222,7 @@ function navBar(){
       </div>
       <div class="nav-links">
         ${links.map(([r,l])=>`<a href="#/${r}" class="${STATE.route===r?'active':''}">${r==="tickets"?l:esc(l)}</a>`).join("")}
-        ${STATE.user && ROLE_LEVEL[STATE.user.role] >= 2 ? `<a href="#/admin" class="${STATE.route==='admin'?'active':''}" onclick="event.preventDefault();nav('admin')">پنل مدیریت</a>` : ""}
+        ${STATE.user && ROLE_LEVEL[STATE.user.role] >= 2 ? `<a href="#/admin" class="${STATE.route==='admin'?'active':''}" onclick="event.preventDefault();openAdminLogin()">پنل مدیریت</a>` : ""}
       </div>
       <div class="nav-cta">
         ${STATE.user
@@ -1225,7 +1231,7 @@ function navBar(){
              <button class="btn btn-sm btn-ghost" onclick="handleLogout()">خروج</button>`
           : `
              <button class="btn btn-sm btn-primary" onclick="nav('register')">به خانواده بپیوندید</button>
-             <button class="btn btn-sm btn-ghost" onclick="location.href='/admin.html'">🛡️ پنل مدیریت</button>`
+             <button class="btn btn-sm btn-ghost" onclick="location.href='./admin.html'">🛡️ پنل مدیریت</button>`
         }
       </div>
     </div>

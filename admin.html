@@ -82,6 +82,7 @@ document.addEventListener('click',function(e){
   if(jump){ activateAdminSection(jump.dataset.jump); }
 });
 const API="/.netlify/functions/api";
+// Dedicated protected management page. Never open the panel without a valid server token.
 let token=localStorage.getItem("yanker_admin_token")||"";
 
 const $=(id)=>document.getElementById(id);
@@ -265,7 +266,7 @@ async function del(id){
 
 async function deleteAnnouncement(id){ if(!confirm("این اطلاعیه حذف شود؟"))return; try{await api("announcement-delete","POST",{id}); await load();}catch(e){alert(e.message);} }
 async function saveAnnouncement(){ const title=$("annTitle").value.trim(), body=$("annBody").value.trim(); if(!title||!body)return; try{await api("announcement-create","POST",{title,body}); $("annTitle").value="";$("annBody").value="";$("announcementForm").classList.add("hidden");await load();}catch(e){alert(e.message);} }
-async function replyTicket(id){ const message=prompt("پاسخ مدیریت:"); if(!message||!message.trim())return; try{await api("ticket-reply","POST",{id,message:message.trim()});await load();}catch(e){alert(e.message);} }
+async function replyTicket(id){ const box=$("reply-"+id); const message=box?.value.trim(); if(!message)return; try{await api("ticket-reply","POST",{id,message}); await load();}catch(e){alert(e.message);} }
 async function closeTicket(id){ try{await api("ticket-close","POST",{id});await load();}catch(e){alert(e.message);} }
 async function deleteTicket(id){ if(!confirm("این تیکت و تمام پیام‌های آن برای همیشه حذف شود؟"))return; try{await api("ticket-delete","POST",{id});await load();}catch(e){alert(e.message);} }
 
@@ -298,7 +299,7 @@ document.addEventListener("DOMContentLoaded",function(){
   $("sendMemberTicket")?.addEventListener("click",sendMemberTicket); $("createPenalty")?.addEventListener("click",async()=>{const username=$("penaltyMember").value,reason=$("penaltyReason").value.trim(),amount=Number($("penaltyAmount").value)||0;if(!username||!reason)return alert("عضو و دلیل جریمه را کامل کنید.");try{await api("penalty-create","POST",{username,reason,amount});$("penaltyReason").value="";$("penaltyAmount").value="";await load()}catch(e){alert(e.message)}});
   document.querySelectorAll(".ticket-filter-btn").forEach(b=>b.addEventListener("click",()=>{ticketFilter=b.dataset.ticketFilter;load();}));
 
-  if(token) load();
+  if(token) load().catch(()=>{ token=""; localStorage.removeItem("yanker_admin_token"); showLogin(); });
   else showLogin();
 });
 })();
